@@ -53,18 +53,36 @@ def end_game(game_id):
 @app.route('/turn/record', methods=['POST'])
 def record_turn():
     data = request.json
-    new_turn = Turn(
-        game_id=data['game_id'],
-        player_number=data['player_number'],
-        turn_number=data['turn_number'],
-        duration=data['duration'],
-        bank_time_used=data['bank_time_used'],
-        penalties=data['penalties'],
-        adventure_cards=data['adventure_cards']
-    )
-    db.session.add(new_turn)
-    db.session.commit()
-    return jsonify({'status': 'success'})
+    try:
+        player = Player.query.filter_by(username=data['username']).first()
+        if not player:
+            assert False, "Player not found"
+
+        new_turn = Turn(
+            game_id=data['game_id'],
+            player_id=player.id,
+            player_number=data['player_number'],
+            turn_number=data['turn_number'],
+            duration=data['duration'],
+            bank_time_used=data['bank_time_used'],
+            penalties=data['penalties'],
+            adventure_cards=data['adventure_cards']
+        )
+        
+        db.session.add(new_turn)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'turn_id': new_turn.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+
 
 
 @app.route('/update_graph', methods=['POST'])
@@ -105,6 +123,7 @@ def get_stats():
             'player_count': game.player_count,
             'turns': [{
                 'player_number': turn.player_number,
+                'player_username': turn.player.username if hasattr(turn, 'player') else None,
                 'turn_number': turn.turn_number,
                 'duration': turn.duration,
                 'penalties': turn.penalties,
